@@ -16,7 +16,7 @@ Check the source, not just the README. Do not assume an earlier completion claim
 Find existing clones in the workspace. Confirm each origin. Clone missing public repositories only into new folders.
 Keep the five repositories as siblings when practical. Do not nest one repository inside another.
 Check Git status before pulling. Never discard, stash, reset, or overwrite user changes without explicit permission.
-For clean clones, fetch main and use a fast-forward update. Create a separate local-validation branch in each repository.
+For clean clones, fetch main and use a fast-forward update. Work on main and push only main. Keep exactly one remote branch, main, and preserve release tags.
 Record the initial commit and any existing changes. Do not require GitHub credentials to run an application.
 
 ## Set up and preserve evidence

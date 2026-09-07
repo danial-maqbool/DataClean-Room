@@ -71,7 +71,7 @@ Keep raw logs, resolved dependency lists, screenshots, and temporary outputs und
 The committed `docs/test-report.json`, `docs/browser-report.json`, and `docs/platforms/` remain historical release evidence.
 New local reports must identify their actual commit and environment. Review evidence before publishing it.
 Never commit user documents, browser history, vaults, passwords, API tokens, model weights, or .venv.
-Use a local-validation branch. Preserve existing changes. Never force-push or reset user work.
+Work on main and push only main. Preserve existing changes. Never force-push or reset user work. Keep exactly one remote branch, main; preserve tags.
 
 If a shared `localdesk/` defect is fixed, compare all five copies and apply only the relevant patch.
 Run each affected repository suite. The apps must remain independently cloneable and runnable.
@@ -101,3 +101,11 @@ See [OCR correction and retest commands](docs/OCR_REDACTION_FIX.md).
 The original Windows FAIL results above remain historical. Rerun the retained
 fixture and DC-04/DC-08 on the target PC before changing local acceptance.
 The native Windows symlink permission checks remain blocked until run locally.
+
+## Current target-PC follow-up: 2026-09-08
+
+Status: BLOCKED. Current report: [local acceptance](docs/LOCAL_ACCEPTANCE_REPORT.md). Tested main `978746e980c8658bac42dd7eca94cbb1e206ecd4`. Fresh source/vault symlink probe failed with WinError 1314; exact tests remain two skips. The user confirmed no disposable Windows session is available. No native service or desktop controls were used in the personal profile.
+
+DataClean DC-04 and DC-08 now PASS on this PC. The exact retained OCR failure was automatically masked with zero manual rectangles and independent Poppler source-truth pixel checks. Fresh suite: 174 run, 171 passed, 3 skipped, no failures/errors; 36 focused OCR tests, 20 existing browser checks and 11 OCR browser checks passed. Original failures remain historical.
+
+Current ignored evidence: `artifacts/local-qa/20260908-final-acceptance-01/`. No new application fix or regression test was needed in this run. Git policy: main only locally/remotely, no temporary remote branches, no force-push or tag rewrite.

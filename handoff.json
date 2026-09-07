@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "handoff_revision": 1,
-  "prepared_on": "2026-09-07",
+  "handoff_revision": 2,
+  "prepared_on": "2026-09-08",
   "repository": "danial-maqbool/DataClean-Room",
   "application_version": "0.2.0",
   "historical_release_commit": "1c0f4a74f9dea7809afde677102f45a3483b4685",
-  "local_acceptance_status": "partial_target_windows_retest_required",
+  "local_acceptance_status": "BLOCKED",
   "default_port": 8765,
   "read_first": [
     "AGENTS.md",
@@ -24,7 +24,7 @@
     "DC-07",
     "DC-08"
   ],
-  "note": "Historical test counts are not a new local acceptance result.",
+  "note": "Current local acceptance is blocked by Windows symlink capability.",
   "ocr_correction": {
     "policy": "docs/OCR_REDACTION_FIX.md",
     "target_retests": [
@@ -32,5 +32,13 @@
       "DC-08"
     ],
     "historical_windows_failure_preserved": true
+  },
+  "local_acceptance_report": "docs/LOCAL_ACCEPTANCE_REPORT.md",
+  "local_tested_commit": "978746e980c8658bac42dd7eca94cbb1e206ecd4",
+  "local_followup_run": "20260908-final-acceptance-01",
+  "branch_policy": "main only; no force-push; preserve tags",
+  "local_case_status": {
+    "DC-04": "PASS",
+    "DC-08": "PASS"
   }
 }

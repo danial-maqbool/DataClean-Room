@@ -15,3 +15,7 @@ Use --report-dir artifacts/local-qa for test and browser reports. Keep raw local
 Test runtime-only installation before adding development packages. Add one regression test for each corrected defect.
 A native service, OS keyring, or desktop adapter needs a real-session test before acceptance.
 Never count a skipped or blocked test as passed. Preserve the exact source revision and command exit codes.
+
+## Git branch policy
+
+Work on main and push only main. Remote repositories must have exactly one branch, main. Do not force-push or rewrite release tags. Preserve user changes.

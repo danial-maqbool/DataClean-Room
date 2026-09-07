@@ -1,6 +1,12 @@
 # OCR correction verification
 
-## Decision
+## Current target-PC result: 2026-09-08
+
+DC-04 and DC-08: PASS on the target Windows 11 PC at main commit `978746e980c8658bac42dd7eca94cbb1e206ecd4`. The exact retained scanned-PDF failure was retested with real Tesseract, zero manual rectangles, and independent Poppler source-truth pixel checks. The original source hash remained unchanged, public content remained visible, and rebuilt output omitted text objects, forms, annotations, attachments and private metadata.
+
+Current full suite: 174 run, 171 passed, 3 skipped, no failures or errors. Existing browser checks: 20 passed; OCR browser checks: 11 passed. The [current local report](LOCAL_ACCEPTANCE_REPORT.md) contains commands, hashes and evidence paths, including preserved failed evidence. Overall acceptance remains BLOCKED only by Windows symlink capability. No disposable Windows session is available; no personal desktop or service was used.
+
+## Historical upstream decision
 
 The reported OCR custom-value miss is corrected in the tested source. The retained
 automatic scanned-PDF acceptance check passes with real OCR on hosted Windows,
