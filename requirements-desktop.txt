@@ -1,0 +1,2 @@
+# Interactive desktop support. Do not enable desktop actions in a service.
+PyAutoGUI==0.9.54

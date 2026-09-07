@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dataclean-local"
+version = "0.2.0"
+description = "Check private data before you share a copy."
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{name = "Danial Maqbool"}]
+dependencies = []
+
+[tool.setuptools.packages.find]
+include = ["app*", "localdesk*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"

@@ -1,0 +1,8 @@
+-r requirements.txt
+-r requirements-desktop.txt
+playwright==1.57.0
+python-docx==1.2.0
+openpyxl==3.1.5
+python-pptx==1.0.2
+pip-audit==2.9.0
+black==25.1.0

@@ -1,0 +1,10 @@
+SYNTHETIC DEMO CONTACT
+Name: Alex Example
+Email: alex@example.test
+Phone: +92 300 1234567
+CNIC-like example: 12345-1234567-1
+Address: 42 Sample Street, Demo City
+Test card number: 4111 1111 1111 1111
+Network address: 192.0.2.10
+Public note: The office meeting starts at 10:30.
+These values are made up or reserved examples. They are not real customer data.

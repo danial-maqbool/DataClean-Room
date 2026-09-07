@@ -1,0 +1,22 @@
+{
+  "name": "DataClean Room",
+  "repository": "DataClean-Room",
+  "slug": "dataclean",
+  "tagline": "Check private data before you share a copy.",
+  "port": 8765,
+  "color": "#226fb0",
+  "version": "0.2.0",
+  "description": "Find supported private-data patterns and create a separate copy for review before sharing.",
+  "topics": [
+    "python",
+    "local-first",
+    "offline",
+    "sqlite",
+    "self-hosted",
+    "data-redaction",
+    "privacy",
+    "document-processing",
+    "metadata",
+    "pii-detection"
+  ]
+}
