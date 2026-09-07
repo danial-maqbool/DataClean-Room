@@ -136,3 +136,10 @@ Passing tests does not prove that all inputs or computers work. Read [Security](
 ## License
 
 MIT. See [LICENSE](LICENSE). External tools and model weights keep their own licenses. See [Sources](docs/SOURCES.md).
+
+## OCR custom-value review
+
+OCR can change letters in a private value. Custom rules now include bounded OCR
+near-matches for values with at least eight letters or digits. The preview shows
+automatic mask outlines. Missing values require explicit review before export.
+Review every exported page. See [matching rules and regression checks](docs/OCR_REDACTION_FIX.md).

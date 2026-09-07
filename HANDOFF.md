@@ -92,3 +92,12 @@ Decision: REJECTED for automatic scanned-PDF secret removal; PARTIAL overall. Se
 Tested source `6cf65c4eca8d161281159cf66b88148b98efded8` on Windows 11 AMD64, Python 3.14.3. Runtime-only setup and real samples completed before dev installation. Windows suite: 138 run, 135 passed, 3 skipped, no failures/errors; strict exits 1. Direct-browser checks: 20 passed with actual downloads. Network-disabled Linux container on this PC: 138 tests, no skips, 20 browser checks.
 
 Windows manifest and browser synchronization checks were repaired with retained regressions. Evidence is ignored under `artifacts/local-qa/20260907-acceptance-01/`. Historical release reports remain historical. Native-session and symlink limits are detailed in the report. Automatic scanned-PDF literal redaction FAILED an exported-pixel canary; manual masks passed separately.
+
+## OCR correction for the local acceptance retest
+
+The custom OCR matcher now includes bounded near-matches and orientation checks.
+Missing custom values require explicit review confirmation before export.
+See [OCR correction and retest commands](docs/OCR_REDACTION_FIX.md).
+The original Windows FAIL results above remain historical. Rerun the retained
+fixture and DC-04/DC-08 on the target PC before changing local acceptance.
+The native Windows symlink permission checks remain blocked until run locally.

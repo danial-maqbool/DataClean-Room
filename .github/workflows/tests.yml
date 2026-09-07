@@ -23,8 +23,10 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-      - if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr ffmpeg
+      - name: Install Linux native test tools
+        if: runner.os == 'Linux'
+        timeout-minutes: 8
+        run: sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update && sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y tesseract-ocr ffmpeg poppler-utils
       - name: Install runtime without development packages
         run: python bootstrap.py
       - name: Check runtime-only environment
@@ -49,6 +51,11 @@ jobs:
           fi
           "$PY" -m pip freeze > artifacts/local-qa/requirements-resolved.txt
           git rev-parse HEAD > artifacts/local-qa/source-commit.txt
+      - name: Verify exported pixels and the retained acceptance fixture
+        if: runner.os == 'Linux'
+        run: |
+          .venv/bin/python scripts/ocr_redaction_check.py --report-dir artifacts/ocr-pixels
+          .venv/bin/python scripts/acceptance_check.py --report-dir artifacts/ocr-acceptance
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
@@ -65,10 +72,14 @@ jobs:
         with:
           python-version: '3.13'
           cache: pip
-      - run: sudo apt-get update && sudo apt-get install -y tesseract-ocr ffmpeg
+      - name: Install native browser test tools
+        timeout-minutes: 8
+        run: sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update && sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y tesseract-ocr ffmpeg
       - run: python bootstrap.py --dev
       - run: .venv/bin/python -m playwright install --with-deps chromium
       - run: .venv/bin/python scripts/browser_check.py --record --report-dir artifacts/local-qa
+      - name: Verify OCR review controls and real downloads
+        run: .venv/bin/python scripts/ocr_browser_check.py --report-dir artifacts/ocr-browser
       - name: Check encrypted worker restart when the project provides the check
         shell: bash
         run: |
