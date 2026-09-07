@@ -195,6 +195,7 @@ class Application(BaseApplication):
                         ocr=settings["ocr"],
                         mode=mode,
                         rectangles=body.get("page_rectangles", []),
+                        ocr_review_confirmed=body.get("ocr_review_confirmed", False),
                     )
                     raw, audit = result["content"], result["audit"]
                     filename = "clean-copy" + result["extension"]
@@ -207,6 +208,7 @@ class Application(BaseApplication):
                         literals=settings["literals"],
                         ocr=True,
                         rectangles=rectangles,
+                        ocr_review_confirmed=body.get("ocr_review_confirmed", False),
                     )
                     raw, audit = result["content"], result["audit"]
                     filename = "clean-image.png"

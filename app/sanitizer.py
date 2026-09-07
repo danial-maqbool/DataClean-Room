@@ -585,6 +585,8 @@ def analyze(
         matches=result["matches"],
         counts=result["counts"],
         pages=result["pages"],
+        automatic_regions=result.get("automatic_regions", []),
+        ocr_review=result.get("ocr_review", {}),
         text_length=len(result["text"]),
         findings=len(result["matches"]) + len(report["metadata"]),
     )

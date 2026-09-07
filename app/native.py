@@ -21,6 +21,7 @@ from xml.etree import ElementTree as ET
 
 from localdesk.safety import InputError, MAX_FILE_BYTES, open_zip, safe_xml, integer
 from .detectors import detect, public_matches, redact
+from .ocr_matching import document_matches, review_warnings, require_review
 
 OFFICE = {".docx", ".xlsx", ".pptx"}
 MAX_PIXELS = 20_000_000
@@ -424,7 +425,132 @@ def _regions(words, matches, scale, width, height):
     return regions
 
 
-def clean_pdf(path, *, enabled=None, literals=None, ocr=False, rectangles=None):
+def _undo_rotation(box, angle, width, height):
+    x0, y0, x1, y1 = box
+    if angle == 90:
+        return [width - y1, x0, width - y0, x1]
+    if angle == 180:
+        return [width - x1, height - y1, width - x0, height - y0]
+    if angle == 270:
+        return [y0, height - x1, y1, height - x0]
+    return list(box)
+
+
+def _recover_orientation(path, document, *, enabled=None, literals=None):
+    """Try bounded quarter turns only on pages without a custom-value candidate."""
+    if not literals or (enabled is not None and "custom" not in enabled):
+        return document
+    from PIL import Image, ImageOps
+    from localdesk.document_worker import ocr_words, render_page
+    from .ocr_matching import normalized, MIN_FUZZY_LENGTH
+
+    if not any(len(normalized(s)) >= MIN_FUZZY_LENGTH for s in literals):
+        return document
+
+    def found(page, text):
+        matches, _ = document_matches(
+            {"text": text, "pages": [page]}, enabled=["custom"], literals=literals
+        )
+        return any(
+            m["start"] < w["end"] and w["start"] < m["end"]
+            for m in matches
+            for w in page["words"]
+        )
+
+    attempts = 0
+    unresolved = []
+    for page in document["pages"]:
+        if found(page, document["text"]):
+            continue
+        if attempts >= 6:
+            unresolved.append(page["page"])
+            continue
+        if path.suffix.lower() == ".pdf":
+            image, _, _ = render_page(path, page["page"] - 1, scale=2)
+            scale = 2
+        else:
+            with Image.open(path) as original:
+                image = ImageOps.exif_transpose(original).convert("RGB")
+            scale = 1
+        recovered = False
+        try:
+            for angle in (90, 180, 270):
+                if attempts >= 6:
+                    break
+                attempts += 1
+                rotated = image.rotate(angle, expand=True)
+                try:
+                    with tempfile.TemporaryDirectory(
+                        prefix="dataclean-orientation-"
+                    ) as folder:
+                        rotated_path = Path(folder) / "page.png"
+                        rotated.save(rotated_path)
+                        words = ocr_words(rotated_path)
+                finally:
+                    rotated.close()
+                text = document["text"] + "\n"
+                previous = None
+                for word in words:
+                    box = _undo_rotation(word["bbox"], angle, image.width, image.height)
+                    word["match_bbox"] = [v / scale for v in word["bbox"]]
+                    word["bbox"] = [v / scale for v in box]
+                    if previous is not None:
+                        text += " " if word["line"] == previous else "\n"
+                    word["start"] = len(text)
+                    text += word["text"]
+                    word["end"] = len(text)
+                    word["orientation"] = angle
+                    previous = word["line"]
+                    if len(text) > 250_000:
+                        raise InputError(
+                            "Orientation OCR exceeds 250,000 characters. Split the input."
+                        )
+                trial = {**page, "words": words}
+                if found(trial, text):
+                    document["text"] = text + "\n"
+                    page["words"].extend(words)
+                    document["warnings"].append(
+                        f"Page {page['page']}: added OCR from a {angle}-degree rotation. Mask positions use the original page coordinates."
+                    )
+                    recovered = True
+                    break
+        finally:
+            image.close()
+        if not recovered:
+            unresolved.append(page["page"])
+    document["unresolved_ocr_pages"] = unresolved
+    document["orientation_attempts"] = attempts
+    return document
+
+
+def _matching_layout(path, ocr, enabled, literals):
+    document = _layout(path, ocr)
+    if ocr:
+        _recover_orientation(path, document, enabled=enabled, literals=literals)
+        matches, review = document_matches(document, enabled=enabled, literals=literals)
+    else:
+        matches = detect(document["text"], enabled=enabled, literals=literals)
+        review = {
+            "candidates": [],
+            "unmatched_rule_ids": [],
+            "short_or_repetitive_rule_ids": [],
+            "unresolved_pages": [],
+            "requires_confirmation": False,
+            "scores_are_probabilities": False,
+        }
+    document["warnings"].extend(review_warnings(review))
+    return document, matches, review
+
+
+def clean_pdf(
+    path,
+    *,
+    enabled=None,
+    literals=None,
+    ocr=False,
+    rectangles=None,
+    ocr_review_confirmed=False,
+):
     from PIL import ImageDraw
     from pypdf import PdfReader, PdfWriter
     from localdesk.document_worker import render_page
@@ -434,10 +560,10 @@ def clean_pdf(path, *, enabled=None, literals=None, ocr=False, rectangles=None):
         raise InputError("Decrypt the PDF yourself before privacy processing.")
     if not 1 <= len(native.pages) <= 50:
         raise InputError("PDF redaction supports 1 to 50 complete pages.")
-    document = _layout(path, ocr)
+    document, matches, review = _matching_layout(path, ocr, enabled, literals)
+    require_review(review, ocr_review_confirmed)
     if len(document["pages"]) != len(native.pages):
         raise InputError("Not all PDF pages were scanned. No clean copy was created.")
-    matches = detect(document["text"], enabled=enabled, literals=literals)
     selected = rectangles or []
     if not isinstance(selected, list) or len(selected) > 100:
         raise InputError("Use at most 100 manual page rectangles.")
@@ -498,6 +624,9 @@ def clean_pdf(path, *, enabled=None, literals=None, ocr=False, rectangles=None):
         "source_objects_copied": False,
         "source_metadata_copied": False,
         "ocr_used": ocr,
+        "ocr_review": review,
+        "ocr_review_confirmed": ocr_review_confirmed,
+        "orientation_attempts": document.get("orientation_attempts", 0),
         "human_review_required": True,
         "warnings": document.get("warnings", [])
         + [
@@ -589,12 +718,25 @@ def process(raw, suffix, action, options):
         path = Path(folder) / ("input" + suffix)
         path.write_bytes(normalize_pdf_geometry(raw) if suffix == ".pdf" else raw)
         if action == "layout":
-            result = _layout(path, bool(options.get("ocr", False)))
-            matches = detect(result["text"], enabled=enabled, literals=literals)
+            result, matches, review = _matching_layout(
+                path, bool(options.get("ocr", False)), enabled, literals
+            )
             return {
                 "text": result["text"],
                 "matches": public_matches(matches),
                 "counts": dict(Counter(m["kind"] for m in matches)),
+                "ocr_review": review,
+                "automatic_regions": [
+                    {"page": p["page"], "rect": r}
+                    for p in result["pages"]
+                    for r in _regions(
+                        p["words"],
+                        matches,
+                        2 if suffix == ".pdf" else 1,
+                        math.ceil(p["width"] * (2 if suffix == ".pdf" else 1)),
+                        math.ceil(p["height"] * (2 if suffix == ".pdf" else 1)),
+                    )
+                ],
                 "pages": [
                     {"page": p["page"], "width": p["width"], "height": p["height"]}
                     for p in result["pages"]
@@ -609,6 +751,7 @@ def process(raw, suffix, action, options):
                 literals=literals,
                 ocr=bool(options.get("ocr", False)),
                 rectangles=options.get("rectangles"),
+                ocr_review_confirmed=options.get("ocr_review_confirmed", False),
             )
             return {
                 "content": base64.b64encode(data).decode("ascii"),
@@ -639,10 +782,13 @@ def process(raw, suffix, action, options):
                 oriented = ImageOps.exif_transpose(image)
                 width, height = oriented.size
             matches = []
+            review = {"requires_confirmation": False}
             auto = []
             if options.get("ocr"):
-                layout = _layout(path, True)
-                matches = detect(layout["text"], enabled=enabled, literals=literals)
+                layout, matches, review = _matching_layout(
+                    path, True, enabled, literals
+                )
+                require_review(review, options.get("ocr_review_confirmed", False))
                 auto = _regions(layout["pages"][0]["words"], matches, 1, width, height)
             selected = options.get("rectangles") or []
             if len(auto) + len(selected) > 6000:
@@ -658,9 +804,12 @@ def process(raw, suffix, action, options):
                     "removed_matches": len(matches),
                     "selected_regions": len(selected),
                     "automatic_regions": len(auto),
+                    "ocr_review": review,
+                    "ocr_review_confirmed": options.get("ocr_review_confirmed", False),
                     "source_metadata_copied": False,
                     "human_review_required": True,
-                    "warnings": notes,
+                    "warnings": notes
+                    + (layout["warnings"] if options.get("ocr") else []),
                 },
             }
     raise InputError("This privacy operation is not supported.")
