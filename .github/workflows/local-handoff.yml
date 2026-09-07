@@ -1,0 +1,140 @@
+name: Verify local testing handoff
+on:
+  push:
+    branches: ['handoff/local-testing']
+permissions:
+  contents: read
+concurrency:
+  group: handoff-local-testing
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: danial-maqbool/LocalFlow-Studio
+          ref: 31736c609b43144531329879593bb16c2abf5348
+          path: _handoff-source
+          persist-credentials: false
+      - name: Apply reviewed source and documentation changes
+        id: source
+        shell: bash
+        run: |
+          python - <<'PYTHON'
+          from pathlib import Path
+          import hashlib, json, lzma, os, shutil, subprocess
+          root = Path('_handoff-source')
+          raw = b''.join((root / n).read_bytes() for n in ['.local-handoff.1.bin', '.local-handoff.2.bin'])
+          if hashlib.sha256(raw).hexdigest() != '6af42bcf52a8871052e4de2929a3ea7a7463587731e31bf9af033f37c4d42ab6':
+              raise SystemExit('Reviewed source bundle hash mismatch.')
+          patches = json.loads(lzma.decompress(raw))
+          name = os.environ['GITHUB_REPOSITORY'].split('/', 1)[1]
+          patch = patches[name].encode('utf-8')
+          subprocess.run(['git', 'apply', '--check', '-'], input=patch, check=True)
+          subprocess.run(['git', 'apply', '-'], input=patch, check=True)
+          m = json.loads(Path('source-manifest.json').read_text(encoding='utf-8'))
+          for name in ['HANDOFF.md', 'handoff.json', 'docs/LOCAL_TESTING.md', 'docs/LOCAL_AGENT_PROMPT.md', 'docs/LOCAL_TEST_RESULTS.template.md', 'scripts/preflight.py', 'tests/test_handoff.py', 'bootstrap.py', 'requirements.txt', '.github/workflows/tests.yml']:
+              m['files'].setdefault(name, '')
+          for name in m['files']:
+              data = Path(name).read_bytes()
+              if name.endswith('.bat'):
+                  data = data.replace(b'\r\n', b'\n')
+              m['files'][name] = hashlib.sha256(data).hexdigest()
+          Path('source-manifest.json').write_text(json.dumps(m, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          Path('.github/workflows/local-handoff.yml').unlink()
+          shutil.rmtree(root)
+          PYTHON
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Add local acceptance handoff, clean setup checks, and separate test evidence'
+          git push origin HEAD:refs/heads/handoff/local-testing
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  test:
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.11', '3.13']
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr ffmpeg
+      - name: Install runtime without development packages
+        run: python bootstrap.py
+      - name: Check runtime-only environment
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = 'Windows' ]; then PY=.venv/Scripts/python.exe; else PY=.venv/bin/python; fi
+          "$PY" scripts/preflight.py --report-dir artifacts/runtime-qa
+          "$PY" -m pip check
+      - name: Install development packages in the same project environment
+        run: python bootstrap.py --dev
+      - name: Run prerequisite and application tests
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = 'Windows' ]; then PY=.venv/Scripts/python.exe; else PY=.venv/bin/python; fi
+          "$PY" -m pip check
+          if [ "$RUNNER_OS" = 'Linux' ]; then
+            "$PY" scripts/preflight.py --tests --require-native --report-dir artifacts/local-qa
+            "$PY" scripts/verify.py --strict --report-dir artifacts/local-qa
+          else
+            "$PY" scripts/preflight.py --tests --report-dir artifacts/local-qa
+            "$PY" scripts/verify.py --report-dir artifacts/local-qa
+          fi
+          "$PY" -m pip freeze > artifacts/local-qa/requirements-resolved.txt
+          git rev-parse HEAD > artifacts/local-qa/source-commit.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: tests-${{ matrix.os }}-${{ matrix.python }}
+          path: artifacts/
+  browser:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: sudo apt-get update && sudo apt-get install -y tesseract-ocr ffmpeg
+      - run: python bootstrap.py --dev
+      - run: .venv/bin/python -m playwright install --with-deps chromium
+      - run: .venv/bin/python scripts/browser_check.py --record --report-dir artifacts/local-qa
+      - name: Check encrypted worker restart when the project provides the check
+        shell: bash
+        run: |
+          if [ -f scripts/worker_check.py ]; then
+            .venv/bin/python scripts/worker_check.py --report-dir artifacts/local-qa
+          fi
+          git rev-parse HEAD > artifacts/local-qa/source-commit.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: browser
+          path: artifacts/
