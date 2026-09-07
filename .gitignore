@@ -20,3 +20,7 @@ dist/
 models/
 *.safetensors
 *.onnx
+
+# Local acceptance evidence can contain private paths and fixture output.
+artifacts/
+.qa/

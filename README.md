@@ -13,6 +13,13 @@ Review files before sharing them. Detect common private-data patterns, select wh
 
 The recording uses synthetic examples in the working application. Frame timing is illustrative.
 
+## Local testing handoff
+
+Start with [HANDOFF.md](HANDOFF.md) after cloning. It lists the remaining local-machine checks.
+Read [requirements and test commands](docs/LOCAL_TESTING.md), then give the [agent brief](docs/LOCAL_AGENT_PROMPT.md) to your local agent.
+Use `python bootstrap.py --dev` to install test tools in this project environment.
+Keep new reports under `artifacts/local-qa`. A historical release report is not a test of your PC.
+
 ## What you can do
 
 | Feature | Behavior |

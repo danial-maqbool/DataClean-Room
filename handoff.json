@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "handoff_revision": 1,
+  "prepared_on": "2026-09-07",
+  "repository": "danial-maqbool/DataClean-Room",
+  "application_version": "0.2.0",
+  "historical_release_commit": "1c0f4a74f9dea7809afde677102f45a3483b4685",
+  "local_acceptance_status": "not_run",
+  "default_port": 8765,
+  "read_first": [
+    "AGENTS.md",
+    "HANDOFF.md",
+    "docs/LOCAL_TESTING.md"
+  ],
+  "agent_prompt": "docs/LOCAL_AGENT_PROMPT.md",
+  "local_report_directory": "artifacts/local-qa",
+  "required_cases": [
+    "DC-01",
+    "DC-02",
+    "DC-03",
+    "DC-04",
+    "DC-05",
+    "DC-06",
+    "DC-07",
+    "DC-08"
+  ],
+  "note": "Historical test counts are not a new local acceptance result."
+}

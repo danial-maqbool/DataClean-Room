@@ -29,11 +29,21 @@ def main():
     parser.add_argument("--browser", default=os.environ.get("BROWSER_EXECUTABLE"))
     parser.add_argument("--bridge", action="store_true")
     parser.add_argument("--record", action="store_true")
+    parser.add_argument("--report-dir", type=Path, default=ROOT / "docs",
+                        help="Output folder for this run, including recorded media.")
     args = parser.parse_args()
+    report_dir = args.report_dir.expanduser()
+    if not report_dir.is_absolute():
+        report_dir = ROOT / report_dir
+    report_dir.mkdir(parents=True, exist_ok=True)
+    (report_dir / "browser-report.json").write_text(
+        json.dumps({"status": "started", "complete": False, "passed": 0}) + "\n",
+        encoding="utf-8",
+    )
     from playwright.sync_api import sync_playwright
 
     config = json.loads((ROOT / "project.json").read_text())
-    (ROOT / "docs/assets").mkdir(parents=True, exist_ok=True)
+    (report_dir / "assets").mkdir(parents=True, exist_ok=True)
     frames = []
     checks = []
     errors = []
@@ -383,7 +393,7 @@ def main():
             page.evaluate("window.scrollTo(0,0)")
             if args.record:
                 page.screenshot(
-                    path=str(ROOT / "docs/assets/screenshot.png"), full_page=True
+                    path=str(report_dir / "assets/screenshot.png"), full_page=True
                 )
             page.locator("#theme-button").click()
             checked(
@@ -392,7 +402,7 @@ def main():
             )
             if args.record:
                 page.screenshot(
-                    path=str(ROOT / "docs/assets/dark-mode.png"), full_page=True
+                    path=str(report_dir / "assets/dark-mode.png"), full_page=True
                 )
             page.locator("#theme-button").click()
             page.set_viewport_size({"width": 390, "height": 844})
@@ -405,7 +415,7 @@ def main():
             )
             if args.record:
                 page.screenshot(
-                    path=str(ROOT / "docs/assets/mobile.png"), full_page=True
+                    path=str(report_dir / "assets/mobile.png"), full_page=True
                 )
             checked("No uncaught browser errors", not errors)
             checked(
@@ -423,14 +433,14 @@ def main():
                     for _, raw in frames
                 ]
                 images[0].save(
-                    ROOT / "docs/assets/demo.gif",
+                    report_dir / "assets/demo.gif",
                     save_all=True,
                     append_images=images[1:],
                     duration=[1800] * len(images),
                     loop=0,
                     optimize=True,
                 )
-                (ROOT / "docs/assets/demo-frames.json").write_text(
+                (report_dir / "assets/demo-frames.json").write_text(
                     json.dumps(
                         [
                             {"frame": i + 1, "caption": text, "duration_ms": 1800}
@@ -453,6 +463,8 @@ def main():
                 )
             report = {
                 "project": name,
+                "status": "passed",
+                "complete": True,
                 "browser": browser_version,
                 "mode": (
                     "local-asset rendering with real HTTP bridge"
@@ -465,10 +477,17 @@ def main():
                 "seconds": round(time.monotonic() - started, 3),
                 "media": "Actual recorded application states, not mockups. GIF timing is illustrative.",
             }
-            (ROOT / "docs/browser-report.json").write_text(
+            (report_dir / "browser-report.json").write_text(
                 json.dumps(report, indent=2) + "\n"
             )
             print(json.dumps(report, indent=2))
+        except Exception as exc:
+            (report_dir / "browser-report.json").write_text(
+                json.dumps({"project": config["repository"], "status": "failed",
+                            "complete": False, "passed": len(checks), "checks": checks,
+                            "errors": errors + [type(exc).__name__ + ": " + str(exc)]},
+                           indent=2) + "\n", encoding="utf-8")
+            raise
         finally:
             if browser:
                 browser.close()

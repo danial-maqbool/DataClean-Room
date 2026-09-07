@@ -1,5 +1,14 @@
 # Changes
 
+## 2026-09-07: local acceptance handoff
+
+- Add project-specific acceptance cases, local requirements, and an agent brief.
+- Add development setup and prerequisite checks.
+- Keep local test reports and recorded media separate from release evidence.
+- Record browser run state to prevent stale success reports after a failed run.
+- Include Office reconstruction packages in DataClean runtime requirements.
+
+
 ## 0.2.0
 
 - Private-data patterns: Find email, phone, identifier, card, IP, and custom literal matches. Review each match.

@@ -11,6 +11,8 @@ import venv
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dev", action="store_true",
+                        help="Install the test tools in the project virtual environment.")
     parser.add_argument(
         "--desktop",
         action="store_true",
@@ -53,6 +55,8 @@ def main() -> int:
             "-r",
             str(root / "requirements.txt"),
         ]
+        if args.dev:
+            command += ["-r", str(root / "requirements-dev.txt")]
         if args.desktop:
             command += ["-r", str(root / "requirements-desktop.txt")]
         if args.wheelhouse:

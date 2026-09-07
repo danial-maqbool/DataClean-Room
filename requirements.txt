@@ -14,3 +14,8 @@ python-xlib==0.33; sys_platform == "linux"
 python-docx==1.2.0
 openpyxl==3.1.5
 python-pptx==1.0.2
+
+# Office reconstruction is a runtime feature, not a test-only feature.
+python-docx==1.2.0
+openpyxl==3.1.5
+python-pptx==1.0.2
