@@ -24,7 +24,7 @@ class HandoffTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="handoff test ")
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.preflight = load("preflight_under_test", ROOT / "scripts/preflight.py")
 
     def test_requirement_markers(self):

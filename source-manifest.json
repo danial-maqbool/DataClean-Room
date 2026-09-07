@@ -44,7 +44,7 @@
     "tests/fixtures.py": "9afbf79cf27eb6b401abb9ab68cd18e5e879515f64ca876becfb3097d724e0d8",
     "tests/support.py": "c99d26cbb11e729a1e171c8fdd9151765b9469f7d20ab8123cabd824b9655063",
     "tests/test_advanced_common.py": "e0adf73429b305f60807d67813b7e491c1224aa9ac217ca8f895e454115f20ce",
-    "tests/test_handoff.py": "a6c160259332bb6b4367190cfaf4d3632f76d17a398e3aa31c94e5af210a1319",
+    "tests/test_handoff.py": "b376b1956e1e8417d0f946b9ca67c0d7cc05cc0058e30b3ba21c7892f17b9d2b",
     "tests/test_http.py": "dbcf6af62fb336ff3737975174b0108360ad1017fba0469e35449205f6cf1c8f",
     "tests/test_portability.py": "1b0db0afffa20076b41d75381cf9632d456af70bad206e5c03959c7e93fed1e0",
     "tests/test_privacy.py": "4422091f566fe21548b4b1b2679aa1e43e28458210fe9e1af1f2fa1d414ff81d",
