@@ -16,40 +16,35 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          repository: danial-maqbool/LocalFlow-Studio
-          ref: 31736c609b43144531329879593bb16c2abf5348
-          path: _handoff-source
-          persist-credentials: false
       - id: source
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
-          import hashlib, json, lzma, os, re, shutil, subprocess
-          root = Path('_handoff-source')
-          raw = b''.join((root / n).read_bytes() for n in ['.local-handoff.1.bin', '.local-handoff.2.bin'])
-          assert hashlib.sha256(raw).hexdigest() == '6af42bcf52a8871052e4de2929a3ea7a7463587731e31bf9af033f37c4d42ab6', 'Source bundle mismatch'
-          patch = json.loads(lzma.decompress(raw))[os.environ['GITHUB_REPOSITORY'].split('/')[1]]
-          patch = ''.join(p for p in re.split(r'(?=^diff --git )', patch, flags=re.M) if not p.startswith('diff --git a/.github/')).encode()
-          subprocess.run(['git', 'apply', '--check', '-'], input=patch, check=True)
-          subprocess.run(['git', 'apply', '-'], input=patch, check=True)
+          import hashlib, json
+          p = Path('tests/test_handoff.py')
+          text = p.read_text(encoding='utf-8')
+          old = 'self.root = Path(self.temp.name)\n'
+          new = 'self.root = Path(self.temp.name).resolve()\n'
+          if old in text:
+              assert text.count(old) == 1, 'Review the changed setup fixture.'
+              p.write_text(text.replace(old, new), encoding='utf-8')
+          else:
+              assert new in text, 'The expected setup fixture is absent.'
           m = json.loads(Path('source-manifest.json').read_text())
-          for n in ['HANDOFF.md', 'handoff.json', 'docs/LOCAL_TESTING.md', 'docs/LOCAL_AGENT_PROMPT.md', 'docs/LOCAL_TEST_RESULTS.template.md', 'scripts/preflight.py', 'tests/test_handoff.py', 'bootstrap.py', 'requirements.txt', '.github/workflows/tests.yml']:
-              m['files'].setdefault(n, '')
           for n in m['files']:
               b = Path(n).read_bytes()
               m['files'][n] = hashlib.sha256(b.replace(b'\r\n', b'\n') if n.endswith('.bat') else b).hexdigest()
           Path('source-manifest.json').write_text(json.dumps(m, indent=2, sort_keys=True)+'\n')
-          shutil.rmtree(root)
           PY
           git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git commit -m 'Add local acceptance handoff and tested setup helpers'
-          git push origin HEAD:refs/heads/handoff/local-testing
+          git add tests/test_handoff.py source-manifest.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Resolve temporary directory aliases in installer regression tests'
+            git push origin HEAD:refs/heads/handoff/local-testing
+          fi
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
   verify:
     needs: prepare
@@ -88,11 +83,15 @@ jobs:
           fi
           "$PY" -m pip freeze > artifacts/local-qa/requirements-resolved.txt
           git rev-parse HEAD > artifacts/local-qa/source-commit.txt
-      - name: Direct browser checks
+      - name: Direct browser and worker checks
         if: runner.os == 'Linux' && matrix.python == '3.13'
+        shell: bash
         run: |
           .venv/bin/python -m playwright install --with-deps chromium
           .venv/bin/python scripts/browser_check.py --record --report-dir artifacts/local-qa
+          if [ -f scripts/worker_check.py ]; then
+            .venv/bin/python scripts/worker_check.py --report-dir artifacts/local-qa
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
