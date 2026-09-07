@@ -138,6 +138,24 @@ A skip is not PASS. A configured feature is not a tested feature. A screenshot i
 
 ## Completion criteria
 
+### Retained acceptance fixtures
+
+The additional acceptance runner keeps synthetic inputs, outputs, hashes, and
+per-check results in a new evidence folder. Existing folders are not overwritten.
+Run it after the runtime-only checks and development installation:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/acceptance_check.py --report-dir artifacts/local-qa/acceptance-new-run
+.\.venv\Scripts\python.exe scripts/browser_check.py --slow-api --record --report-dir artifacts/local-qa/browser-new-run
+.\.venv\Scripts\python.exe scripts/browser_interaction_check.py --report-dir artifacts/local-qa/interaction-new-run
+```
+
+The browser check uses real downloads and validates their bytes. The optional
+`--slow-api` check delays test requests but still uses the real local backend.
+Bridge mode does not perform the new browser-download checks.
+An OCR miss is a failed automatic-redaction check even if a separately reviewed
+manual mask succeeds. Read each result instead of treating a created file as proof.
+
 The local acceptance pass is complete only when the applicable checklist passes with evidence.
 Record the exact source commit, local modifications, interpreter, OS, package versions, commands, exit codes, skips, and output hashes.
 Measure startup, representative job duration, and peak memory on this machine. Do not invent universal minimum hardware requirements.

@@ -33,9 +33,16 @@ def safe_target(name: str) -> Path:
 
 
 def digest(raw: bytes, name: str = "") -> str:
-    # Git stores canonical LF text but checks .bat files out with CRLF.
-    # Normalize only that declared text format. Binary fixture bytes stay exact.
-    if name.endswith(".bat"):
+    # Git's text=auto checkout can give Windows source text CRLF endings.
+    # Hash canonical source text while preserving binary and NUL-containing fixtures.
+    text_suffixes = {
+        ".bat", ".py", ".sh", ".md", ".txt", ".csv", ".json", ".toml",
+        ".yml", ".yaml", ".js", ".css", ".html", ".svg", ".ini", ".cfg",
+    }
+    text_names = {".gitattributes", ".gitignore", ".editorconfig", "LICENSE"}
+    if b"\x00" not in raw and (
+        Path(name).suffix.lower() in text_suffixes or Path(name).name in text_names
+    ):
         raw = raw.replace(b"\r\n", b"\n")
     return hashlib.sha256(raw).hexdigest()
 

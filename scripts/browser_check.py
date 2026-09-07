@@ -9,6 +9,8 @@ It does not change browser policy or application source files.
 from __future__ import annotations
 import argparse
 import base64
+import csv
+import hashlib
 import io
 import json
 import os
@@ -29,6 +31,8 @@ def main():
     parser.add_argument("--browser", default=os.environ.get("BROWSER_EXECUTABLE"))
     parser.add_argument("--bridge", action="store_true")
     parser.add_argument("--record", action="store_true")
+    parser.add_argument("--slow-api", action="store_true",
+                        help="Delay test POST requests while still using the real backend.")
     parser.add_argument("--report-dir", type=Path, default=ROOT / "docs",
                         help="Output folder for this run, including recorded media.")
     args = parser.parse_args()
@@ -89,6 +93,17 @@ def main():
             page = browser.new_page(
                 viewport={"width": 1440, "height": 1040}, device_scale_factor=1
             )
+            pending_api = set()
+            page.on("request", lambda request: pending_api.add(request)
+                    if request.url.startswith(url + "/api/") else None)
+            page.on("requestfinished", lambda request: pending_api.discard(request))
+            page.on("requestfailed", lambda request: pending_api.discard(request))
+            if args.slow_api:
+                def delayed_post(route):
+                    if route.request.method == "POST":
+                        time.sleep(0.8)
+                    route.continue_()
+                page.route("**/api/**", delayed_post)
             page.on("pageerror", lambda e: errors.append(str(e)))
             page.on("request", lambda request: requests.append(request.url))
             if args.bridge:
@@ -149,15 +164,85 @@ def main():
             checked("Main view renders")
 
             def settle():
-                page.wait_for_timeout(250)
-                page.locator("#job-bar").wait_for(state="hidden", timeout=30000)
-                page.wait_for_timeout(200)
+                deadline = time.monotonic() + 30
+                quiet_since = None
+                while time.monotonic() < deadline:
+                    page.wait_for_timeout(50)
+                    if pending_api or page.locator("#job-bar").is_visible():
+                        quiet_since = None
+                    elif quiet_since is None:
+                        quiet_since = time.monotonic()
+                    elif time.monotonic() - quiet_since >= 0.2:
+                        break
+                else:
+                    raise AssertionError("The API or job did not become idle within 30 seconds.")
                 faults = page.locator(".toast.error").all_text_contents()
                 if faults:
                     raise AssertionError("UI operation failed: " + str(faults))
 
+            downloaded_artifacts = set()
+            download_evidence = []
+
             def frame(label, scroll=None):
                 settle()
+                buttons = ([] if args.bridge else
+                           page.locator("[data-artifact], #export-search, #export-events").all())
+                for button in buttons:
+                    if button.get_attribute("id") == "export-search" and not page.locator(".search-hit").count():
+                        continue
+                    if button.get_attribute("id") == "export-events" and not page.locator("[data-event]").count():
+                        continue
+                    identity = button.inner_text()
+                    if identity in downloaded_artifacts or not button.is_visible():
+                        continue
+                    with page.expect_response(
+                        lambda response: "/api/download?" in response.url
+                    ) as response_info, page.expect_download() as download_info:
+                        button.click()
+                    download = download_info.value
+                    raw = Path(download.path()).read_bytes()
+                    # Chromium can omit attachment bodies from its debugging protocol.
+                    # Compare the completed browser download with an authenticated
+                    # independent HTTP read instead of that optional debug body.
+                    token = page.locator('meta[name="local-session"]').get_attribute("content")
+                    request = urllib.request.Request(
+                        response_info.value.url, headers={"X-Local-Token": token}
+                    )
+                    with urllib.request.urlopen(request, timeout=10) as response:
+                        wire = response.read()
+                    if raw != wire:
+                        (report_dir / "download-mismatch.bin").write_bytes(raw)
+                        (report_dir / "response-mismatch.bin").write_bytes(wire)
+                        (report_dir / "download-mismatch.json").write_text(json.dumps({
+                            "download": download.suggested_filename, "download_bytes": len(raw),
+                            "response_bytes": len(wire), "response_status": response_info.value.status,
+                            "response_headers": response_info.value.headers,
+                        }, indent=2), encoding="utf-8")
+                    checked("Downloaded bytes match the backend: " + download.suggested_filename,
+                            raw == wire and bool(raw))
+                    suffix = Path(download.suggested_filename).suffix.lower()
+                    if suffix == ".json":
+                        json.loads(raw)
+                    elif suffix == ".csv":
+                        rows = list(csv.reader(io.StringIO(raw.decode("utf-8-sig"))))
+                        checked("Downloaded CSV contains header and records", len(rows) > 1)
+                    if config["repository"] == "LocalFlow-Studio" and suffix == ".txt":
+                        checked("Downloaded invoice is byte-identical to its source",
+                                raw in [p.read_bytes() for p in (ROOT / "examples").glob("invoice-*.txt")])
+                    if config["repository"] == "DataClean-Room" and suffix == ".txt":
+                        checked("Downloaded clean text removes the synthetic email",
+                                b"alex@example.test" not in raw)
+                    destination = report_dir / "downloads" / (
+                        str(len(download_evidence) + 1) + "-" + Path(download.suggested_filename).name
+                    )
+                    destination.parent.mkdir(exist_ok=True)
+                    download.save_as(destination)
+                    download_evidence.append({"file": destination.name, "bytes": len(raw),
+                                              "sha256": hashlib.sha256(raw).hexdigest()})
+                    (report_dir / "download-evidence.json").write_text(
+                        json.dumps(download_evidence, indent=2) + "\n", encoding="utf-8"
+                    )
+                    downloaded_artifacts.add(identity)
                 page.locator(".toast").evaluate_all("(xs)=>xs.forEach(x=>x.remove())")
                 if scroll:
                     page.locator(scroll).scroll_into_view_if_needed()
@@ -405,6 +490,15 @@ def main():
                     path=str(report_dir / "assets/dark-mode.png"), full_page=True
                 )
             page.locator("#theme-button").click()
+            page.locator("#theme-button").focus()
+            page.keyboard.press("Tab")
+            checked("Keyboard navigation has a visible focus indicator",
+                    page.evaluate("""() => {
+                        const el = document.activeElement;
+                        const style = getComputedStyle(el);
+                        return el !== document.body &&
+                            (parseFloat(style.outlineWidth) > 0 || style.boxShadow !== 'none');
+                    }"""))
             page.set_viewport_size({"width": 390, "height": 844})
             settle()
             checked(
@@ -472,6 +566,8 @@ def main():
                     else "direct loopback navigation"
                 ),
                 "checks": checks,
+                "download_checks": len(download_evidence),
+                "download_scope": "not run in bridge mode" if args.bridge else "real browser downloads",
                 "passed": len(checks),
                 "errors": errors,
                 "seconds": round(time.monotonic() - started, 3),
