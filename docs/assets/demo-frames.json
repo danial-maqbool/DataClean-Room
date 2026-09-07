@@ -1,0 +1,22 @@
+[
+  {
+    "frame": 1,
+    "caption": "Start with a local workspace",
+    "duration_ms": 1800
+  },
+  {
+    "frame": 2,
+    "caption": "Review pattern matches and the replacement text",
+    "duration_ms": 1800
+  },
+  {
+    "frame": 3,
+    "caption": "Create a new copy and keep the input unchanged",
+    "duration_ms": 1800
+  },
+  {
+    "frame": 4,
+    "caption": "Select visible pixels for opaque redaction",
+    "duration_ms": 1800
+  }
+]

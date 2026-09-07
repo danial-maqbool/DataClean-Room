@@ -1,0 +1,27 @@
+{
+  "project": "DataClean-Room",
+  "browser": "143.0.7499.4",
+  "mode": "direct loopback navigation",
+  "checks": [
+    "Main view renders",
+    "Four example files are scanned",
+    "Clean preview removes the sample email",
+    "Clean text and audit report are available",
+    "Image region selection is available",
+    "Image clean copy is exported",
+    "Navigation: Scan and review",
+    "Navigation: Detection rules",
+    "Navigation: Clean copies",
+    "Navigation: Coverage and jobs",
+    "Dark theme control works",
+    "Mobile viewport has no page-wide overflow",
+    "No uncaught browser errors",
+    "No external browser network request",
+    "Closing the browser leaves the worker running",
+    "Worker health remains available after browser close"
+  ],
+  "passed": 16,
+  "errors": [],
+  "seconds": 11.169,
+  "media": "Actual recorded application states, not mockups. GIF timing is illustrative."
+}
